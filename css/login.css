@@ -1,0 +1,245 @@
+/* Reset & base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Quicksand", sans-serif;
+}
+
+body {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  background: url('../images/_space and star background with circular timewarp2.jpg') center/cover no-repeat;
+  font-family: sans-serif;
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1;
+}
+
+/* Layering */
+.ring,
+.login {
+  position: relative;
+  z-index: 2;
+}
+
+/* Ring container */
+.ring {
+  width: 90vw;
+  max-width: 500px;
+  height: 90vw;
+  max-height: 500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+/* Ring circles */
+.ring i {
+  position: absolute;
+  inset: 0;
+  border: 2px solid #fff;
+  transition: 0.5s;
+}
+
+.ring i:nth-child(1) {
+  border-radius: 38% 62% 63% 37% / 41% 44% 56% 59%;
+  animation: animate 6s linear infinite;
+}
+
+.ring i:nth-child(2) {
+  border-radius: 41% 44% 56% 59% / 38% 62% 63% 37%;
+  animation: animate 4s linear infinite;
+}
+
+.ring i:nth-child(3) {
+  border-radius: 41% 44% 56% 59% / 38% 62% 63% 37%;
+  animation: animate2 10s linear infinite;
+}
+
+.ring:hover i {
+  border: 6px solid var(--clr);
+  filter: drop-shadow(0 0 20px var(--clr));
+}
+
+/* Login box */
+.login {
+  width: 80%;
+  max-width: 320px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 25px;
+  color: #fff;
+}
+
+.login h2 {
+  font-size: 2em;
+}
+
+.inputBx {
+  width: 100%;
+  position: relative;
+}
+
+.inputBx input {
+  width: 100%;
+  padding: 12px 20px;
+  background: transparent;
+  border: 2px solid #fff;
+  border-radius: 40px;
+  font-size: 1.2em;
+  color: #fff;
+  outline: none;
+  box-shadow: none;
+}
+
+.inputBx input::placeholder {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.inputBx input[type="submit"] {
+  background: linear-gradient(45deg, #ff357a, #fff172);
+  border: none;
+  cursor: pointer;
+  margin-top: 25px;
+  border-radius: 40px;
+}
+
+/* Links */
+.links {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 20px;
+}
+
+.links a {
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Animations */
+@keyframes animate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes animate2 {
+  0% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .login h2 {
+    font-size: 1.5em;
+  }
+  .inputBx input {
+    font-size: 1em;
+    padding: 10px 16px;
+  }
+}
+
+/* Error styles */
+.input-error {
+  border-color: #ff4a4a !important;
+  box-shadow: 0 0 6px #ff4a4a;
+}
+
+.error-message {
+  color: #ff4a4a;
+  font-size: 0.9em;
+  margin-top: 4px;
+  padding-left: 5px;
+  text-shadow: 0 0 2px #ff4a4a;
+}
+
+#error-popup {
+  position: fixed;
+  top: 15%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 0, 0, 0.85);
+  color: #ff6666;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 1em;
+  text-shadow: 0 0 5px #ff1e1e;
+  border: 2px solid #ff1e1e;
+  box-shadow: 0 0 12px #ff1e1e;
+  z-index: 9999;
+  animation: slideDown 0.4s ease, fadeOut 0.5s ease 3s forwards;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+}
+
+.shake {
+  animation: shakeAnim 0.4s ease-in-out;
+}
+
+@keyframes shakeAnim {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+  75% {
+    transform: translateX(-5px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* Screen-reader only class for labels */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

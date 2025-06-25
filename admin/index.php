@@ -2,24 +2,63 @@
 
 require "includes/dbh.php";
 
-// Start session if not started yet
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Prevent browser caching to avoid back-button access after logout
-header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
-header("Cache-Control: post-check=0, pre-check=0", false);
-header("Pragma: no-cache");
-
-// Redirect to login if user not authenticated
-if (!isset($_SESSION['username'])) {
-    header("Location: http://localhost/blog/login.html");  // Adjust path if needed
-    exit;
-}
+require "includes/protect.php";
 
 // Include any session cleanup/unsetting if necessary
 include "includes/unset-session.php";
+
+
+// ----- Securely get number of blogs with status = 1 -----
+$status = 1;  // Status meaning "active" or "published"
+$sqlNumBlogs = "SELECT COUNT(*) AS total FROM blog_post WHERE f_post_status = ?";
+$stmtNumBlogs = mysqli_prepare($conn, $sqlNumBlogs);
+mysqli_stmt_bind_param($stmtNumBlogs, "i", $status);
+mysqli_stmt_execute($stmtNumBlogs);
+$resultNumBlogs = mysqli_stmt_get_result($stmtNumBlogs);
+
+if ($resultNumBlogs) {
+    $rowNumBlogs = mysqli_fetch_assoc($resultNumBlogs);
+    $numBlogs = $rowNumBlogs['total'];
+} else {
+    $numBlogs = 0; // Default to 0 if query fails
+}
+mysqli_stmt_close($stmtNumBlogs);
+
+
+// ----- Securely get number of comments for posts with status = 1 -----
+// Fixed JOIN condition: blog_comment.n_blog_post_id (foreign key) should join blog_post.n_blog_post_id (primary key)
+$sqlNumComments = "SELECT COUNT(*) AS total FROM blog_comment 
+                   INNER JOIN blog_post ON blog_comment.n_blog_post_id = blog_post.n_blog_post_id
+                   WHERE blog_post.f_post_status = ?";
+				   
+$stmtNumComments = mysqli_prepare($conn, $sqlNumComments);
+mysqli_stmt_bind_param($stmtNumComments, "i", $status);
+mysqli_stmt_execute($stmtNumComments);
+$resultNumComments = mysqli_stmt_get_result($stmtNumComments);
+
+if ($resultNumComments) {
+    $rowNumComments = mysqli_fetch_assoc($resultNumComments);
+    $numComments = $rowNumComments['total'];
+} else {
+    $numComments = 0;
+}
+mysqli_stmt_close($stmtNumComments);
+
+
+// ----- Securely get number of subscribers -----
+$sqlNumSubscribers = "SELECT COUNT(*) AS total FROM subscribers";
+$stmtNumSubscribers = mysqli_prepare($conn, $sqlNumSubscribers);
+mysqli_stmt_execute($stmtNumSubscribers);
+$resultNumSubscribers = mysqli_stmt_get_result($stmtNumSubscribers);
+
+if ($resultNumSubscribers) {
+    $rowNumSubscribers = mysqli_fetch_assoc($resultNumSubscribers);
+    $numSubscribers = $rowNumSubscribers['total'];
+} else {
+    $numSubscribers = 0;
+}
+mysqli_stmt_close($stmtNumSubscribers);
+
 ?>
 
 <!DOCTYPE html>
@@ -47,9 +86,9 @@ include "includes/unset-session.php";
 <body>
     <div id="wrapper">
 
-<!-- Include header and sidebar -->
- <?php include "header.php"; ?>
- <?php include "sidebar.php"; ?>        
+        <!-- Include header and sidebar -->
+        <?php include "header.php"; ?>
+        <?php include "sidebar.php"; ?>
 
         <!-- Main content wrapper -->
         <div id="page-wrapper">
@@ -64,7 +103,7 @@ include "includes/unset-session.php";
 
                 <!-- Dashboard Stats Panels -->
                 <div class="row">
-                    <!-- Total Visits -->
+                    <!-- Total Visits (hardcoded) -->
                     <div class="col-md-4 col-sm-12 col-xs-12">
                         <div class="panel panel-primary text-center no-boder bg-color-green">
                             <div class="panel-body">
@@ -76,29 +115,14 @@ include "includes/unset-session.php";
                             </div>
                         </div>
                     </div>
-					
-					
-					<?php 
 
-$sqlNumBlogs = "SELECT COUNT(*) AS total FROM blog_post WHERE f_post_status= '1'";
-$resultNumBlogs = mysqli_query($conn, $sqlNumBlogs);
-
-if ($resultNumBlogs) {
-    $row = mysqli_fetch_assoc($resultNumBlogs);
-    $numBlogs = $row['total'];
-} else {
-    $numBlogs = 0;
-}
-
-?>
-					
                     <!-- Blogs -->
                     <div class="col-md-4 col-sm-12 col-xs-12">
                         <div class="panel panel-primary text-center no-boder bg-color-blue">
                             <div class="panel-body">
                                 <i class="fas fa-file-alt fa-5x"></i>
-                               <h3 id="num-blogs"><?php echo number_format($numBlogs); ?></h3>
-							   <small id="blogs-status" style="display:none; font-size:12px; color:#888;">Updating...</small>
+                                <h3 id="num-blogs"><?php echo number_format($numBlogs); ?></h3>
+                                <small id="blogs-status" style="display:none; font-size:12px; color:#888;">Updating...</small>
                             </div>
                             <div class="panel-footer back-footer-blue">
                                 Blogs
@@ -106,63 +130,28 @@ if ($resultNumBlogs) {
                         </div>
                     </div>
 
-<?php 
-
-$sqlNumComments = "
-    SELECT COUNT(*) AS total
-    FROM blog_comment
-    JOIN blog_post ON blog_comment.n_blog_comment_id = blog_post.n_blog_post_id
-    WHERE blog_post.f_post_status = '1'
-";
-
-$resultNumComments = mysqli_query($conn, $sqlNumComments);
-
-if ($resultNumComments) {
-    $row = mysqli_fetch_assoc($resultNumComments);
-    $numComments = $row['total'];
-} else {
-    $numComments = 0;
-}
-?>					
                     <!-- Comments -->
                     <div class="col-md-4 col-sm-12 col-xs-12">
                         <div class="panel panel-primary text-center no-boder bg-color-red">
                             <div class="panel-body">
                                 <i class="fa fa-comments fa-5x"></i>
                                 <h3 id="num-comments"><?php echo number_format($numComments); ?></h3>
-								<small id="comments-status" style="display:none; font-size:12px; color:#888;">Updating...</small>
+                                <small id="comments-status" style="display:none; font-size:12px; color:#888;">Updating...</small>
                             </div>
                             <div class="panel-footer back-footer-red">
                                 Comments
                             </div>
-                        </div><i class="fa-solid fa-users-rays"></i>
+                        </div>
+                        <i class="fa-solid fa-users-rays"></i>
                     </div>
 
-<?php			
-
-//COUNT(*) counts all rows.
-//AS total gives the result column the name total.
-//Count all the rows in the subscribers table (no matter what).
-//Then give that number the label (alias) total in the result.
-
-$sqlNumSubscribers = "SELECT COUNT(*) AS total FROM subscribers";		
-$resultSubscriber = mysqli_query($conn, $sqlNumSubscribers);
-
-if ($resultSubscriber) {
-    $row = mysqli_fetch_assoc($resultSubscriber);
-    $numSubscriber = $row['total'];
-} else {
-    $numSubscriber = 0;
-}
-?>						
-					
-					<!-- Comments -->
+                    <!-- Subscribers -->
                     <div class="col-md-4 col-sm-12 col-xs-12">
-                         <div class="panel panel-primary text-center no-boder" style="background-color:white;  color: #6f42c1;">
+                        <div class="panel panel-primary text-center no-boder" style="background-color:white;  color: #6f42c1;">
                             <div class="panel-body">
-                               <i class="fa fa-users fa-5x"></i>
-                                <h3 id="num-subscribers"><?php echo number_format($numSubscriber); ?></h3>
-								<small id="subscribers-status" style="display:none; font-size:12px; color: #6f42c1;">Updating...</small>
+                                <i class="fa fa-users fa-5x"></i>
+                                <h3 id="num-subscribers"><?php echo number_format($numSubscribers); ?></h3>
+                                <small id="subscribers-status" style="display:none; font-size:12px; color: #6f42c1;">Updating...</small>
                             </div>
                             <div class="panel-footer" style="background-color: #5a379d; color: white;">
                                 Subscribers
@@ -189,22 +178,27 @@ if ($resultSubscriber) {
     <script src="assets/js/morris/raphael-2.1.0.min.js"></script>
     <script src="assets/js/morris/morris.js"></script>
     <script src="assets/js/custom-scripts.js"></script>
-	<script>
-function updateDashboardStats() {
-    fetch('includes/dashboard-update.php')
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('num-blogs').textContent = Number(data.blogs).toLocaleString();
-            document.getElementById('num-comments').textContent = Number(data.comments).toLocaleString();
-        })
-        .catch(error => console.error("Error loading stats:", error));
-}
 
-// Run on page load + every 60 seconds
-updateDashboardStats();
-setInterval(updateDashboardStats, 30000);
-</script>
+    <script>
+        // Fetch latest stats every 30 seconds
+        function updateDashboardStats() {
+            fetch('includes/dashboard-update.php')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('num-blogs').textContent = Number(data.blogs).toLocaleString();
+                    document.getElementById('num-comments').textContent = Number(data.comments).toLocaleString();
+                    document.getElementById('num-subscribers').textContent = Number(data.subscribers).toLocaleString();
+                })
+                .catch(error => console.error("Error loading stats:", error));
+        }
 
+        // Run on page load + every 30 seconds
+        updateDashboardStats();
+        setInterval(updateDashboardStats, 30000);
+    </script>
+	
 </body>
+
+<script src="../js/timeout-warning.js"></script>
 
 </html>

@@ -1,98 +1,60 @@
-/* ==================================== Dashboard Stats Update Logic ============================== */ 
-/* ==================================== Dashboard Stats Update Logic ============================== */ 
-/* ==================================== Dashboard Stats Update Logic ============================== */ 
- // Fetch latest stats every 30 seconds
-        function updateDashboardStats() {
-            fetch('includes/dashboard-update.php')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('num-blogs').textContent = Number(data.blogs).toLocaleString();
-                    document.getElementById('num-comments').textContent = Number(data.comments).toLocaleString();
-                    document.getElementById('num-subscribers').textContent = Number(data.subscribers).toLocaleString();
-                })
-                .catch(error => console.error("Error loading stats:", error));
-        }
+document.addEventListener("DOMContentLoaded", () => {
+ /* const timeout = 30 * 60 * 1000; // 30 minutes
+  const warningTime = 1 * 60 * 1000; // warn at 29 minutes
+  const logoutTime = timeout + 5 * 1000; // extra buffer*/
+  
+ const timeout = 1 * 20 * 1000;       // 1 minute total timeout
+const warningTime = 15 * 1000;       // warn at 30 seconds
+const logoutTime = timeout + 5 * 1000;  // logout at 1:05 min
 
-        // Run on page load + every 30 seconds
-        updateDashboardStats();
-        setInterval(updateDashboardStats, 10000);
+  let warningTimer, logoutTimer;
+  let countdownInterval;
+  let timeLeft = 10; // seconds for countdown
 
- 
- /* ================================================================== Timeout Warning Logic ================================ */
-  /* ================================================================== Timeout Warning Logic ================================ */
-   /* ================================================================== Timeout Warning Logic ================================ */
- document.addEventListener("DOMContentLoaded", () => {
-  // === CONFIGURATION ===
-  const idleLimit = 800000;             //  seconds of no activity before showing the warning
-  const warningCountdown = 10000;       // second countdown warning
-  const logoutDelay = idleLimit + warningCountdown; //  seconds total before logout
-
-  // === STATE ===
-  let warningTimer, logoutTimer, countdownInterval;
-  let secondsLeft = warningCountdown / 1000;
-
-  // === RESET ALL TIMERS ON USER ACTIVITY ===
-  const resetInactivityTimers = () => {
+  function resetTimers() {
     clearTimeout(warningTimer);
     clearTimeout(logoutTimer);
     clearInterval(countdownInterval);
     removeWarningPopup();
 
-    warningTimer = setTimeout(showInactivityWarning, idleLimit);
-
+    warningTimer = setTimeout(showWarningPopup, timeout - warningTime);
     logoutTimer = setTimeout(() => {
-      // Call logout.php via POST, then redirect
-      fetch("http://localhost/blog/logout.php", { method: "POST" })
-        .then(() => {
-          window.location.href = "http://localhost/blog/login.html";
-        })
-        .catch(() => {
-          window.location.href = "http://localhost/blog/login.html";
-        });
-    }, logoutDelay);
-  };
+      window.location.href = "http://localhost/blog/logout.php";
+    }, logoutTime);
+  }
 
-  // === DISPLAY WARNING POPUP ===
-  const showInactivityWarning = () => {
-    if (document.getElementById("inactivity-warning")) return;
+  function showWarningPopup() {
+    if (document.getElementById("timeout-warning")) return;
 
     const popup = document.createElement("div");
-	  popup.id = "inactivity-warning";
-	  popup.style = `
-	  position: fixed;
-	  top: 15%;
-	  left: 50%;
-	  transform: translateX(-50%);
-	  background: rgba(30, 0, 0, 0.85);
-	  color: #ff6666;
-	  padding: 30px 40px;            /* bigger padding */
-	  border-radius: 16px;
-	  font-size: 1.4em;             /* bigger font */
-	  border: 3px solid #ff1e1e;
-	  box-shadow: 0 0 20px #ff1e1e;
-	  z-index: 9999;
-	  text-shadow: 0 0 3px #ff1e1e;
-	  text-align: center;
-	  display: flex;
-	  align-items: center;
-	  justify-content: center;
-	  gap: 16px;
-	  min-width: 350px;             /* minimum width */
-	  max-width: 600px;             /* maximum width */
-	`;
+    popup.id = "timeout-warning";
+    popup.style.position = "fixed";
+    popup.style.top = "15%";
+    popup.style.left = "50%";
+    popup.style.transform = "translateX(-50%)";
+    popup.style.background = "rgba(30, 0, 0, 0.85)";
+    popup.style.color = "#ff6666";
+    popup.style.padding = "14px 24px";
+    popup.style.borderRadius = "12px";
+    popup.style.fontSize = "1em";
+    popup.style.border = "2px solid #ff1e1e";
+    popup.style.boxShadow = "0 0 12px #ff1e1e";
+    popup.style.zIndex = "9999";
+    popup.style.textShadow = "0 0 2px #ff1e1e";
+    popup.style.textAlign = "center";
+    popup.style.display = "flex";
+    popup.style.alignItems = "center";
+    popup.style.justifyContent = "center";
+    popup.style.gap = "12px";
 
-
-    const minutes = Math.floor(secondsLeft / 60);
-const seconds = (secondsLeft % 60).toString().padStart(2, '0');
-
-popup.innerHTML = `
-  <span>You will be logged out in <strong><span id="countdown">${minutes}min ${seconds}sec</span></strong> due to inactivity.</span>
-      <button id="dismissWarning" style="
-        background: #ff1e1e;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        padding: 6px 12px;
+    popup.innerHTML = `
+      <span>You will be logged out in <strong><span id="countdown">10</span></strong> seconds due to inactivity.</span>
+      <button id="dismissTimeoutWarning" style="
+        background: #ff1e1e; 
+        color: #fff; 
+        border: none; 
+        border-radius: 6px; 
+        padding: 6px 12px; 
         cursor: pointer;
         font-weight: bold;
         box-shadow: 0 0 6px #ff1e1e;
@@ -101,36 +63,29 @@ popup.innerHTML = `
 
     document.body.appendChild(popup);
 
-    document.getElementById("dismissWarning").addEventListener("click", () => {
+    document.getElementById("dismissTimeoutWarning").addEventListener("click", () => {
       removeWarningPopup();
-      resetInactivityTimers();
+      resetTimers(); // reset timers on dismiss as well
     });
 
     countdownInterval = setInterval(() => {
-      secondsLeft--;
-      const countdownEl = document.getElementById("countdown");
-      if (countdownEl) {
-        const minutes = Math.floor(secondsLeft / 60);
-        const seconds = (secondsLeft % 60).toString().padStart(2, '0');
-        countdownEl.textContent = `${minutes}min ${seconds}sec`;
-      }
-      if (secondsLeft <= 0) clearInterval(countdownInterval);
+      timeLeft--;
+      document.getElementById("countdown").textContent = timeLeft;
+      if (timeLeft <= 0) clearInterval(countdownInterval);
     }, 1000);
-  };
+  }
 
-  // === REMOVE WARNING POPUP ===
-  const removeWarningPopup = () => {
-    const popup = document.getElementById("inactivity-warning");
+  function removeWarningPopup() {
+    const popup = document.getElementById("timeout-warning");
     if (popup) popup.remove();
-    secondsLeft = warningCountdown / 1000;
-  };
+    timeLeft = 10;
+  }
 
-  // === USER ACTIVITY EVENTS ===
-  ["click", "mousemove", "keypress", "scroll"].forEach(event =>
-    document.addEventListener(event, resetInactivityTimers)
-  );
+  // Activity resets the timers
+  ["click", "mousemove", "keypress", "scroll"].forEach(event => {
+    document.addEventListener(event, resetTimers);
+  });
 
-  // === INIT ===
-  resetInactivityTimers();
+  resetTimers(); // Initialize timers
 });
  

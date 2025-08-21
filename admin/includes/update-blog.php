@@ -9,17 +9,20 @@ session_start();
 
 // Check if the submit-blog button was clicked
 if(isset($_POST['submit-edit-blog'])){
-    
-    // Capture all form data
-	$blogId = $_POST['blog-id'];
-    $title = $_POST['blog-title'];
-    $metaTitle = $_POST['blog-meta-title'];
-    $blogCategoryId = $_POST['blog-category'];
-    $blogSummary = $_POST['blog-summary'];
-    $blogContent = $_POST['blog-content'];
-    $blogTags = $_POST['blog-tags'];
-    $blogPath = $_POST['blog-path'];
-    $homePagePlacement = $_POST['blog-home-page-placement'];
+
+
+// mysqli_real_escape_string escapes special characters in a string so they don’t break your SQL query — especially characters like:
+// ' (single quote)
+//" (double quote)
+// \ (backslash)
+$blogCategoryId = mysqli_real_escape_string($conn, $_POST['blog-category']);
+$title = mysqli_real_escape_string($conn, $_POST['blog-title']);
+$metaTitle = mysqli_real_escape_string($conn, $_POST['blog-meta-title']);
+$blogSummary = mysqli_real_escape_string($conn, $_POST['blog-summary']);
+$blogContent = mysqli_real_escape_string($conn, $_POST['blog-content']);
+$blogTags = mysqli_real_escape_string($conn, $_POST['blog-tags']);
+$blogPath = mysqli_real_escape_string($conn, $_POST['blog-path']);
+$blogId = mysqli_real_escape_string($conn, $_POST['blog-id']);
     
     // Get the current date and time
     $date = date("Y-m-d");

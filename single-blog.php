@@ -1,134 +1,133 @@
 <?php
+require "admin/includes/dbh.php";
 
-		require "admin/includes/dbh.php";
-		
-		if(isset($_REQUEST['blog'])){
-			
-			$blogPath = $_REQUEST['blog'];
-			
-			$sqlGetBlog = "SELECT * FROM blog_post WHERE v_post_path = '$blogPath' AND f_post_status ='1'";
-			$queryGetBlog = mysqli_query($conn, $sqlGetBlog);
-			
-			if($rowGetBlog = mysqli_fetch_assoc($queryGetBlog)){
-				$blogPostId = $rowGetBlog['n_blog_post_id'];
-				$blogCategoryId = $rowGetBlog['n_category_id'];
-				$blogTitle = $rowGetBlog['v_post_title'];
-				$blogMetaTitle = $rowGetBlog['v_post_meta_title'];
-				$blogContent = $rowGetBlog['v_post_content'];
-				$blogMainImgUrl = $rowGetBlog['v_main_image_url'];
-				$blogCreationDate = $rowGetBlog['d_date_created'];
-			
-			}else{
-				header("Location: index.php");
-				exit();
-			}
-			
-			$sqlGetCategory = "SELECT * FROM blog_category WHERE n_category_id = '$blogCategoryId'";
-			$queryGetCategory = mysqli_query($conn, $sqlGetCategory);
-			
-			 if($rowGetCategory = mysqli_fetch_assoc($queryGetCategory)){
-				$categoryTitle = $rowGetCategory['v_category_title'];
-				$blogCategoryPath = $rowGetCategory['v_category_path'];
-			}
-			
-			$sqlGetTags = "SELECT * FROM blog_tag WHERE n_blog_post_id = '$blogPostId'";
-			$queryGetTags = mysqli_query($conn, $sqlGetTags);
-			
-			if($rowGetTags = mysqli_fetch_assoc($queryGetTags)){
-				$blogTags = $rowGetTags['v_tag'];
-				$blogTagsArr = explode(",", $blogTags);
-			}
-			
-		}
-		
+// Initialize variables to avoid undefined variable warnings
+$blogPostId = $blogCategoryId = $blogTitle = $blogMetaTitle = $blogContent = $blogMainImgUrl = $blogCreationDate = '';
+$categoryTitle = $blogCategoryPath = '';
+$blogTagsArr = [];
+$numComments = 0;
+
+// Validate and sanitize input
+if(isset($_GET['blog'])) {
+    $blogPath = $_GET['blog'];
+    
+    // Get blog post
+    $sqlGetBlog = "SELECT * FROM blog_post WHERE v_post_path = ? AND f_post_status = '1'";
+    $stmt = mysqli_prepare($conn, $sqlGetBlog);
+    mysqli_stmt_bind_param($stmt, "s", $blogPath);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    
+    if($rowGetBlog = mysqli_fetch_assoc($result)) {
+        $blogPostId = $rowGetBlog['n_blog_post_id'];
+        $blogCategoryId = $rowGetBlog['n_category_id'];
+        $blogTitle = htmlspecialchars($rowGetBlog['v_post_title']);
+        $blogMetaTitle = htmlspecialchars($rowGetBlog['v_post_meta_title']);
+        $blogContent = $rowGetBlog['v_post_content']; // Note: This is HTML content
+        $blogMainImgUrl = htmlspecialchars($rowGetBlog['v_main_image_url']);
+        $blogCreationDate = $rowGetBlog['d_date_created'];
+    } else {
+        header("Location: index.php");
+        exit();
+    }
+    
+    // Get category
+    $sqlGetCategory = "SELECT * FROM blog_category WHERE n_category_id = ?";
+    $stmt = mysqli_prepare($conn, $sqlGetCategory);
+    mysqli_stmt_bind_param($stmt, "i", $blogCategoryId);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    
+    if($rowGetCategory = mysqli_fetch_assoc($result)) {
+        $categoryTitle = htmlspecialchars($rowGetCategory['v_category_title']);
+        $blogCategoryPath = htmlspecialchars($rowGetCategory['v_category_path']);
+    }
+    
+    // Get tags
+    $sqlGetTags = "SELECT * FROM blog_tag WHERE n_blog_post_id = ?";
+    $stmt = mysqli_prepare($conn, $sqlGetTags);
+    mysqli_stmt_bind_param($stmt, "i", $blogPostId);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    
+    if($rowGetTags = mysqli_fetch_assoc($result)) {
+        $blogTags = $rowGetTags['v_tag'];
+        $blogTagsArr = array_filter(explode(",", $blogTags));
+    }
+    
+    // Get comment count
+    $sqlGetAllComments = "SELECT COUNT(*) as count FROM blog_comment WHERE n_blog_post_id = ?";
+    $stmt = mysqli_prepare($conn, $sqlGetAllComments);
+    mysqli_stmt_bind_param($stmt, "i", $blogPostId);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $row = mysqli_fetch_assoc($result);
+    $numComments = $row['count'];
+}
 ?>
 
 <!DOCTYPE html>
 <html class="no-js" lang="en">
 <head>
-
-    <!--- basic page needs
-    ================================================== -->
     <meta charset="utf-8">
-    <title>Son's Blog | <?php echo $blogMetaTitle ?></title>
+    <title>Son's Blog | <?php echo htmlspecialchars($blogMetaTitle) ?></title>
     <meta name="description" content="">
     <meta name="author" content="">
-
-    <!-- mobile specific metas
-    ================================================== -->
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- CSS
-    ================================================== -->
+    <!-- CSS -->
     <link rel="stylesheet" href="css/vendor.css">
     <link rel="stylesheet" href="css/styles.css">
 
-    <!-- script
-    ================================================== -->
-    <script src="js/modernizr.js"></script>
-    <script defer src="js/fontawesome/all.min.js"></script>
+    <!-- Scripts -->
+    <script src="js/modernizr.js" defer></script>
+    <script src="js/fontawesome/all.min.js" defer></script>
 
-    <!-- favicons
-    ================================================== -->
+    <!-- Favicons -->
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="manifest" href="site.webmanifest">
-
 </head>
 
 <body id="top">
-
-
-    <!-- preloader
-    ================================================== -->
+    <!-- Preloader -->
     <div id="preloader"> 
-    	<div id="loader"></div>
+        <div id="loader"></div>
     </div>
 
+    <!-- Header -->
+    <?php include "header-opaque.php" ?>
 
-    <!-- header
-    ================================================== -->
-	
-	<?php include "header-opaque.php" ?>
-	
-     <!-- end s-header -->
-
-    <!-- content
-    ================================================== -->
+    <!-- Main Content -->
     <section class="s-content">
-
         <div class="row">
             <div class="column large-12">
-
                 <article class="s-content__entry format-standard">
-
                     <div class="s-content__media">
                         <div class="s-content__post-thumb">
-                            <img src="<?php echo $blogMainImgUrl; ?>" 
-                                 srcset="<?php echo $blogMainImgUrl; ?> 2100w, 
-                                        <?php echo $blogMainImgUrl; ?>  1050w, 
-                                         <?php echo $blogMainImgUrl; ?>  525w" sizes="(max-width: 2100px) 100vw, 2100px" alt="">
+                            <img src="<?php echo htmlspecialchars($blogMainImgUrl) ?>" 
+                                 srcset="<?php echo htmlspecialchars($blogMainImgUrl) ?> 2100w, 
+                                         <?php echo htmlspecialchars($blogMainImgUrl) ?> 1050w, 
+                                         <?php echo htmlspecialchars($blogMainImgUrl) ?> 525w" 
+                                 sizes="(max-width: 2100px) 100vw, 2100px" 
+                                 alt="<?php echo htmlspecialchars($blogTitle) ?>">
                         </div>
-                    </div> <!-- end s-content__media -->
+                    </div>
 
                     <div class="s-content__entry-header">
-                        <h1 class="s-content__title s-content__title--post"><?php echo $blogTitle; ?></h1>
-                    </div> <!-- end s-content__entry-header -->
+                        <h1 class="s-content__title s-content__title--post"><?php echo htmlspecialchars($blogTitle) ?></h1>
+                    </div>
 
                     <div class="s-content__primary">
-
                         <div class="s-content__entry-content">
-
-                            <?php echo $blogContent; ?>
-
-                        </div> <!-- end s-entry__entry-content -->
+                            <?php echo $blogContent // Note: This is trusted HTML content ?>
+                        </div>
 
                         <div class="s-content__entry-meta">
-
                             <div class="entry-author meta-blk">
                                 <div class="author-avatar">
-                                    <img class="avatar" src="images/avatars/user-05.JPG" alt="">
+                                    <img class="avatar" src="images/avatars/user-05.JPG" alt="Son Le">
                                 </div>
                                 <div class="byline">
                                     <span class="bytext">Posted By</span>
@@ -137,301 +136,230 @@
                             </div>
 
                             <div class="meta-bottom">
-                                
                                 <div class="entry-cat-links meta-blk">
                                     <div class="cat-links">
                                         <span>In</span> 
-                                        <a href="categories.php?group=<?php echo $blogCategoryPath; ?>"><?php echo $categoryTitle ?></a>
+                                        <a href="categories.php?group=<?php echo urlencode($blogCategoryPath) ?>">
+                                            <?php echo $categoryTitle ?>
+                                        </a>
                                     </div>
-
                                     <span>On</span>
                                     <?php echo date("M j, Y", strtotime($blogCreationDate)) ?>
                                 </div>
 
                                 <div class="entry-tags meta-blk">
                                     <span class="tagtext">Tags</span>
-									
-                                    <?php 
-									
-									for($i =0; $i< count($blogTagsArr); $i++){
-										if(!empty($blogTagsArr[$i])){
-											echo "<a href='search.php?query=".$blogTagsArr[$i]."'>".$blogTagsArr[$i]."</a>";
-										}
-									}
-
-									?>
+                                    <?php foreach ($blogTagsArr as $tag): ?>
+                                        <?php if (!empty(trim($tag))): ?>
+                                            <a href="search.php?query=<?php echo urlencode(trim($tag)) ?>">
+                                                <?php echo htmlspecialchars(trim($tag)) ?>
+                                            </a>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
                                 </div>
-
                             </div>
+                        </div>
 
-                        </div> <!-- s-content__entry-meta -->
-
+                        <!-- Previous/Next Navigation -->
                         <div class="s-content__pagenav">
-							
-						<?php   
-							
-								$sqlGetPreviousBlog = "SELECT * FROM blog_post WHERE n_blog_post_id = (SELECT max(n_blog_post_id) FROM blog_post WHERE n_blog_post_id < '".$blogPostId."' ) AND f_post_status = '1'";
-								$queryGetPreviousBlog = mysqli_query($conn, $sqlGetPreviousBlog);
-								
-								$sqlGetNextBlog = "SELECT * FROM blog_post WHERE n_blog_post_id = (SELECT min(n_blog_post_id) FROM blog_post WHERE n_blog_post_id > '".$blogPostId."') AND f_post_status = '1'";
-								$queryGetNextBlog = mysqli_query($conn, $sqlGetNextBlog);
-								
-								
-						if($rowGetPreviousBlog = mysqli_fetch_assoc($queryGetPreviousBlog)){
-									$previousBlogName = $rowGetPreviousBlog['v_post_title'];
-									$previousBlogPath = $rowGetPreviousBlog['v_post_path'];
-									
-										
-									echo '<div class="prev-nav">
-													<a href="single-blog.php?blog='.$previousBlogPath.'" rel="prev">
-													<span>Previous</span>
-													'.$previousBlogName.'
-													</a>
-										  </div>';
-								}
-								
-						if($rowGetNextBlog = mysqli_fetch_assoc($queryGetNextBlog)){
-									$NextBlogName = $rowGetNextBlog['v_post_title'];
-									$NextBlogPath = $rowGetNextBlog['v_post_path'];
-									
-									echo '<div class="next-nav">
-													<a href="single-blog.php?blog='.$NextBlogPath.'" rel="next">
-													<span>Next</span>
-													'.$NextBlogName.'
-													</a>
-											  </div>';
-								}
-								
-						?>
-						
-                       
-                         </div> <!-- end s-content__pagenav -->
+                            <?php
+                            // Previous blog post
+                            $sqlGetPreviousBlog = "SELECT v_post_title, v_post_path 
+                                                  FROM blog_post 
+                                                  WHERE n_blog_post_id = (
+                                                      SELECT MAX(n_blog_post_id) 
+                                                      FROM blog_post 
+                                                      WHERE n_blog_post_id < ? AND f_post_status = '1'
+                                                  )";
+                            $stmt = mysqli_prepare($conn, $sqlGetPreviousBlog);
+                            mysqli_stmt_bind_param($stmt, "i", $blogPostId);
+                            mysqli_stmt_execute($stmt);
+                            $result = mysqli_stmt_get_result($stmt);
+                            
+                            if ($rowGetPreviousBlog = mysqli_fetch_assoc($result)) {
+                                echo '<div class="prev-nav">
+                                        <a href="single-blog.php?blog=' . urlencode($rowGetPreviousBlog['v_post_path']) . '" rel="prev">
+                                            <span>Previous</span>
+                                            ' . htmlspecialchars($rowGetPreviousBlog['v_post_title']) . '
+                                        </a>
+                                      </div>';
+                            }
+                            
+                            // Next blog post
+                            $sqlGetNextBlog = "SELECT v_post_title, v_post_path 
+                                              FROM blog_post 
+                                              WHERE n_blog_post_id = (
+                                                  SELECT MIN(n_blog_post_id) 
+                                                  FROM blog_post 
+                                                  WHERE n_blog_post_id > ? AND f_post_status = '1'
+                                              )";
+                            $stmt = mysqli_prepare($conn, $sqlGetNextBlog);
+                            mysqli_stmt_bind_param($stmt, "i", $blogPostId);
+                            mysqli_stmt_execute($stmt);
+                            $result = mysqli_stmt_get_result($stmt);
+                            
+                            if ($rowGetNextBlog = mysqli_fetch_assoc($result)) {
+                                echo '<div class="next-nav">
+                                        <a href="single-blog.php?blog=' . urlencode($rowGetNextBlog['v_post_path']) . '" rel="next">
+                                            <span>Next</span>
+                                            ' . htmlspecialchars($rowGetNextBlog['v_post_title']) . '
+                                        </a>
+                                      </div>';
+                            }
+                            ?>
+                        </div>
+                    </div>
+                </article>
+            </div>
+        </div>
 
-                    </div> <!-- end s-content__primary -->
-                </article> <!-- end entry -->
-
-            </div> <!-- end column -->
-        </div> <!-- end row -->
-	
-		<?php  
-		// this script didn't run
-		/*$sqlGetAllComments = "SELECT * FROM blog_comment WHERE n_blog_post_id = '$blogPostId'";
-		$queryGetAllcomments = mysqli_query($conn, $sqlGetAllComments);
-		$numComments = mysqli_num_rows($queryGetAllComments);*/
-	
-	// This will run
-   /* $sqlGetAllComments = "SELECT * FROM blog_comment WHERE n_blog_post_id = '$blogPostId'";
-	$queryGetAllcomments = mysqli_query($conn, $sqlGetAllComments) or die("Query Error: " . mysqli_error($conn));
-    $numComments = mysqli_num_rows($queryGetAllcomments);*/
-	
-		if (!empty($blogPostId)) {
-			$sqlGetAllComments = "SELECT * FROM blog_comment WHERE n_blog_post_id = '$blogPostId'";
-    
-			$queryGetAllcomments = mysqli_query($conn, $sqlGetAllComments) or die("Query Error: " . mysqli_error($conn));
-	
-			$numComments = mysqli_num_rows($queryGetAllcomments);
-		} else {
-					echo "No blog post ID available.";
-	}
- 
-		?>
-	
-        <!-- comments
-        ================================================== -->
+        <!-- Comments Section -->
         <div class="comments-wrap">
-
             <div id="comments" class="row">
                 <div class="column large-12">
+                    <h3><?php echo $numComments ?> Comments</h3>
 
-                    <h3><?php echo $numComments; ?> Comments</h3>
-
-                    <!-- START commentlist -->
                     <ol class="commentlist" id="commentlist">
-					
-						<?php
-						
-						$sqlGetComments = "SELECT * FROM blog_comment WHERE n_blog_post_id = '$blogPostId' AND n_blog_comment_parent_id ='0' ORDER BY d_date_created ASC";
-						
-						$queryGetComments = mysqli_query($conn, $sqlGetComments);
-						
-						while($rowComments =  mysqli_fetch_assoc($queryGetComments)){
-							
-							$commentId = $rowComments['n_blog_comment_id'];
-							$commentAuthor = $rowComments['v_comment_author'];
-							$comment = $rowComments['v_comment'];
-							$commentDate = $rowComments['d_date_created'];
-							
-							$sqlCheckCommentChildren = "SELECT * FROM blog_comment WHERE n_blog_comment_parent_id ='$commentId' ORDER BY d_date_created ASC";
-							
-							$queryCheckCommentChildren = mysqli_query($conn, $sqlCheckCommentChildren);
-							$numCommentChildren = mysqli_num_rows($queryCheckCommentChildren);
-							
-						if($numCommentChildren ==0){
-						
-						?>
-							
-						<li class="depth-1 comment">                         
-                            <div class="comment__content">
-                                <div class="comment__info">
-									<input type="hidden" id="comment-author-<?php echo $commentId; ?>" value="<?php echo $commentAuthor; ?>" />
-                                    <div class="comment__author"><?php echo $commentAuthor; ?></div>
-                                    <div class="comment__meta">
-                                        <div class="comment__time"><?php echo date("M j, Y", strtotime($commentDate)); ?></div>
-                                        <div class="comment__reply">
-                                            <a class="comment-reply-link" href="#reply-comment-section" onclick="prepareReply('<?php echo $commentId; ?>');">Reply</a>
+                        <?php
+                        $sqlGetComments = "SELECT * FROM blog_comment 
+                                         WHERE n_blog_post_id = ? AND n_blog_comment_parent_id = '0' 
+                                         ORDER BY d_date_created ASC";
+                        $stmt = mysqli_prepare($conn, $sqlGetComments);
+                        mysqli_stmt_bind_param($stmt, "i", $blogPostId);
+                        mysqli_stmt_execute($stmt);
+                        $result = mysqli_stmt_get_result($stmt);
+                        
+                        while ($rowComments = mysqli_fetch_assoc($result)) {
+                            $commentId = $rowComments['n_blog_comment_id'];
+                            $commentAuthor = htmlspecialchars($rowComments['v_comment_author']);
+                            $comment = htmlspecialchars($rowComments['v_comment']);
+                            $commentDate = $rowComments['d_date_created'];
+                            
+                            // Check for replies
+                            $sqlCheckCommentChildren = "SELECT * FROM blog_comment 
+                                                      WHERE n_blog_comment_parent_id = ? 
+                                                      ORDER BY d_date_created ASC";
+													  
+                            $stmtChildren = mysqli_prepare($conn, $sqlCheckCommentChildren);
+                            mysqli_stmt_bind_param($stmtChildren, "i", $commentId);
+                            mysqli_stmt_execute($stmtChildren);
+                            $resultChildren = mysqli_stmt_get_result($stmtChildren);
+                            $numCommentChildren = mysqli_num_rows($resultChildren);
+                            
+                            $hasChildren = $numCommentChildren > 0;
+                            ?>
+                            
+                            <li class="<?php echo $hasChildren ? 'thread-alt' : '' ?> depth-1 comment">                         
+                                <div class="comment__content">
+                                    <div class="comment__info">
+                                        <input type="hidden" id="comment-author-<?php echo $commentId ?>" value="<?php echo $commentAuthor ?>" />
+                                        <div class="comment__author"><?php echo $commentAuthor ?></div>
+                                        <div class="comment__meta">
+                                            <div class="comment__time"><?php echo date("M j, Y", strtotime($commentDate)) ?></div>
+                                            <div class="comment__reply">
+                                                <a class="comment-reply-link" href="#reply-comment-section" onclick="prepareReply('<?php echo $commentId ?>');">Reply</a>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                                <div class="comment__text">
-                                <p><?php echo $comment; ?></p>
-                                </div>
-                            </div>
-                        </li> <!-- end comment level 1 -->
-						
-						<?php	
-						
-							}else{
-								
-							?>
-							
-						<li class="thread-alt depth-1 comment">                         
-                            <div class="comment__content">
-                                <div class="comment__info">
-									<input type="hidden" id="comment-author-<?php echo $commentId; ?>" value="<?php echo $commentAuthor; ?>" />
-                                    <div class="comment__author"><?php echo $commentAuthor; ?></div>
-                                    <div class="comment__meta">
-                                        <div class="comment__time"><?php echo date("M j, Y", strtotime($commentDate)); ?></div>
-                                        <div class="comment__reply">
-                                            <a class="comment-reply-link" href="#reply-comment-section" onclick="prepareReply('<?php echo $commentId; ?>');">Reply</a>
-                                        </div>
+                                    <div class="comment__text">
+                                        <p><?php echo $comment ?></p>
                                     </div>
                                 </div>
-                                <div class="comment__text">
-                                <p><?php echo $comment; ?></p>
-                                </div>
-                            </div>     
-								
-								<?php 
-									while($rowCommentChildren = mysqli_fetch_assoc($queryCheckCommentChildren)){
-										$commentIdChild = $rowCommentChildren['n_blog_comment_id'];
-										$commentAuthorChild = $rowCommentChildren['v_comment_author'];
-										$commentChild = $rowCommentChildren['v_comment'];
-										$commentDateChild = $rowCommentChildren['d_date_created'];
-										
-										echo " <ul class='children'>
-												  <li class='depth-2 comment'>	 
-														<div class='comment__content'>
-															<div class='comment__info'>
-														<div class='comment__author'>".$commentAuthorChild."</div>
-														<div class='comment__meta'>
-															<div class='comment__time'>".date("M j, Y", strtotime($commentDateChild))."</div>
-														</div>
-														</div>
-															<div class='comment__text'>
-																<p>".$commentChild."</p>
-															</div>
-														</div>
-													</li>
-												</ul>";
-												
-									}
-													
-							}
-							
-						}
-						
-					?>
-                        </li>
-                                         
+                                
+                                <?php if ($hasChildren): ?>
+                                    <ul class="children">
+                                        <?php while ($rowCommentChildren = mysqli_fetch_assoc($resultChildren)): ?>
+                                            <?php
+                                            $commentIdChild = $rowCommentChildren['n_blog_comment_id'];
+                                            $commentAuthorChild = htmlspecialchars($rowCommentChildren['v_comment_author']);
+                                            $commentChild = htmlspecialchars($rowCommentChildren['v_comment']);
+                                            $commentDateChild = $rowCommentChildren['d_date_created'];
+                                            ?>
+                                            <li class="depth-2 comment">     
+                                                <div class="comment__content">
+                                                    <div class="comment__info">
+                                                        <div class="comment__author"><?php echo $commentAuthorChild ?></div>
+                                                        <div class="comment__meta">
+                                                            <div class="comment__time"><?php echo date("M j, Y", strtotime($commentDateChild)) ?></div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="comment__text">
+                                                        <p><?php echo $commentChild; ?></p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        <?php endwhile; ?>
+                                    </ul>
+                                <?php endif; ?>
+                            </li>
+                        <?php } ?>
                     </ol>
-                    <!-- END commentlist -->
+                </div>
+            </div>
 
-                </div> <!-- end col-full -->
-            </div> <!-- end comments -->
-
-			            <div class="row comment-respond" id="reply-comment-section">
-
-                <!-- START respond -->
-                <div id="respond" class="column">
-
-                    <h3 id="reply-h3"> </h3>
-					
-					<p style="color:green; display:none;" id="reply-success">Your reply was added successfully.</p>		
-					<p style="color:red; display:none;" id="reply-error"></p>
+            <!-- Reply Form (hidden by default) -->
+            <div class="row comment-respond" id="reply-comment-section" style="display: none;">
+                <div class="column">
+                    <h3 id="reply-h3"></h3>
+                    <p class="success-message" id="reply-success" style="color:green; display:none;">Your reply was added successfully.</p>      
+                    <p class="error-message" id="reply-error" style="display:none;"></p>
 
                     <form name="replyForm" id="replyForm">
                         <fieldset>
-							<input type="hidden" name="replyBlogPostId" id="replyBlogPostId" value="<?php echo $blogPostId; ?>"/>
+                            <input type="hidden" name="replyBlogPostId" id="replyBlogPostId" value="<?php echo $blogPostId ?>"/>
                             <input type="hidden" name="commentParentId" id="commentParentId" value="" />
-							
-							<div class="form-field">
-                                <input name="replycName" id="replycName" class="h-full-width h-remove-bottom" placeholder="Your Name" value="" type="text">
+                            
+                            <div class="form-field">
+                                <input name="replycName" id="replycName" class="h-full-width h-remove-bottom" placeholder="Your Name" type="text" maxlength="50" required>
                             </div>
                             <div class="form-field">
-                                <input name="replycEmail" id="replycEmail" class="h-full-width h-remove-bottom" placeholder="Your Email" value="" type="text">
+                                <input name="replycEmail" id="replycEmail" class="h-full-width h-remove-bottom" placeholder="Your Email" type="email" maxlength="50" required>
                             </div>       
                             <div class="message form-field">
-                                <textarea name="replycMessage" id="replycMessage" class="h-full-width" placeholder="Your Message"></textarea>
+                                <textarea name="replycMessage" id="replycMessage" class="h-full-width" placeholder="Your Message" maxlength="500" required></textarea>
                             </div>
                             <br>
-                            <input name="submit" id="submitReplyForm" class="btn btn--primary btn-wide btn--large h-full-width" value="Reply" type="submit">
-                            <input name="submit" id="addComment" class="btn btn--primary btn-wide btn--large h-full-width" value="Add Comment" onclick="prepareComment();">
-						</fieldset>
-                    </form> <!-- end form -->
-
+                            <button type="submit" id="submitReplyForm" class="btn btn--primary btn-wide btn--large h-full-width">Reply</button>
+                            <button type="button" id="addComment" class="btn btn--primary btn-wide btn--large h-full-width" onclick="prepareComment();">Add Comment</button>
+                        </fieldset>
+                    </form>
                 </div>
-                <!-- END respond-->
+            </div>
 
-            </div> <!-- end comment-respond -->
-
+            <!-- Add Comment Form -->
             <div class="row comment-respond" id="add-comment-section">
-
-                <!-- START respond -->
-                <div id="respond" class="column">
-
+                <div class="column">
                     <h3>
-                    Add Comment 
-                    <span>Your email address will not be published.</span>
+                        Add Comment 
+                        <span>Your email address will not be published.</span>
                     </h3>
-					
-					<p style="color:green; display:none;" id="comment-success">Your comment was added successfully.</p>		
-					<p style="color:red; display:none;" id="comment-error"></p>
+                    
+                    <p class="success-message" id="comment-success" style="color:green; display:none;">Your comment was added successfully.</p>      
+                    <p class="error-message" id="comment-error" style="display:none;"></p>
 
                     <form name="commentForm" id="commentForm">
                         <fieldset>
-							<input type="hidden" name="blogPostId" id="blogPostId" value="<?php echo $blogPostId; ?>"  />
+                            <input type="hidden" name="blogPostId" id="blogPostId" value="<?php echo $blogPostId ?>" />
                             <div class="form-field">
-                                <input name="cName" id="cName" class="h-full-width h-remove-bottom" placeholder="Your Name" value="" type="text">
+                                <input name="cName" id="cName" class="h-full-width h-remove-bottom" placeholder="Your Name" type="text" maxlength="50" required>
                             </div>
                             <div class="form-field">
-                                <input name="cEmail" id="cEmail" class="h-full-width h-remove-bottom" placeholder="Your Email" value="" type="text">
+                                <input name="cEmail" id="cEmail" class="h-full-width h-remove-bottom" placeholder="Your Email" type="email" maxlength="50" required>
                             </div>       
                             <div class="message form-field">
-                                <textarea name="cMessage" id="cMessage" class="h-full-width" placeholder="Your Message"></textarea>
+                                <textarea name="cMessage" id="cMessage" class="h-full-width" placeholder="Your Message" maxlength="500" required></textarea>
                             </div>
                             <br>
-                            <input name="submit" id="submitCommentForm" class="btn btn--primary btn-wide btn--large h-full-width" value="Add Comment" type="submit">
+                            <button type="submit" id="submitCommentForm" class="btn btn--primary btn-wide btn--large h-full-width">Add Comment</button>
                         </fieldset>
-                    </form> <!-- end form -->
-
+                    </form>
                 </div>
-                <!-- END respond-->
+            </div>
+        </div>
+    </section>
 
-            </div> <!-- end comment-respond -->
-
-        </div> <!-- end comments-wrap -->
-
-
-    </section> <!-- end s-content -->
-
-
-    <!-- footer
-    ================================================== -->
-    
+    <!-- Footer -->
     <?php include "footer.php"; ?>
-
-	
-	<!-- end s-footer -->
 
 
     <!-- JavaScript

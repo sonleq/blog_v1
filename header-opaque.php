@@ -30,7 +30,7 @@ $queryCategories = mysqli_query($conn, $sqlCategories);
 							
 							while($rowCategories = mysqli_fetch_assoc($queryCategories)){
 								
-								$categoryName = htmlspecialchars($rowCategories['v_category_title']);
+								$categoryName = $rowCategories['v_category_title'];
                                 $categoryPath = urlencode($rowCategories['v_category_path']);
 								
 								echo "<li><a href='categories.php?group=". urlencode($categoryPath)."'>". htmlspecialchars($categoryName) ."</a></li>";

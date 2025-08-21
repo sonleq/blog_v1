@@ -1,6 +1,7 @@
 <?php
 
-$sqlCategories = "SELECT * FROM blog_category";
+// Fetch blog categories
+$sqlCategories = "SELECT v_category_title, v_category_path FROM blog_category";
 $queryCategories = mysqli_query($conn, $sqlCategories);
 
 ?>
@@ -30,9 +31,9 @@ $queryCategories = mysqli_query($conn, $sqlCategories);
 							while($rowCategories = mysqli_fetch_assoc($queryCategories)){
 								
 								$categoryName = $rowCategories['v_category_title'];
-								$categoryPath = $rowCategories['v_category_path'];
+                                $categoryPath = urlencode($rowCategories['v_category_path']);
 								
-								echo "<li><a href='categories.php?group=".$categoryPath."'>".$categoryName."</a></li>";
+								echo "<li><a href='categories.php?group=". urlencode($categoryPath)."'>". htmlspecialchars($categoryName) ."</a></li>";
 							}
 							
 							?>
@@ -55,18 +56,21 @@ $queryCategories = mysqli_query($conn, $sqlCategories);
             <div class="s-header__search-inner">
                 <div class="row wide">
 
-                    <form role="search" method="get" class="s-header__search-form" action="search.php">
+                    <form id="searchForm" role="search" method="get" class="s-header__search-form" action="search.php">
                         <label>
                             <span class="h-screen-reader-text">Search for:</span>
-                            <input type="search" class="s-header__search-field" placeholder="Search for..." value="" name="query" title="Search for:" autocomplete="off">
+                            <input type="search" id="searchInput" name="query" class="s-header__search-field" placeholder="Search for..." title="Search for:" autocomplete="off" required>
                         </label>
                         <input type="submit" class="s-header__search-submit" value="Search"> 
                     </form>
+					
+					
 
                     <a href="#0" title="Close Search" class="s-header__overlay-close">Close</a>
 
                 </div> <!-- end row -->
             </div> <!-- s-header__search-inner -->
+ 
 
         </div> <!-- end s-header__search wrap -->	
 

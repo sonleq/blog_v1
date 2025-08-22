@@ -1,23 +1,27 @@
 <?php
-
 // Include the database connection file
 require "admin/includes/dbh.php";
 
 // Check if the 'group' parameter is set in the URL query string
-if(isset($_GET['group'])){
+if (isset($_GET['group'])) {
 
-    // Get the category path from the URL parameter
-    $categoryPath = $_GET['group'];
+    // Get the category path from the URL parameter and trim whitespace
+    $categoryPath = trim($_GET['group']);
 
-    // Prepare SQL query to fetch category details based on the category path
-    $sqlGetCategory = "SELECT * FROM blog_category WHERE v_category_path = '$categoryPath'";
-    // Execute the query
-    $queryGetCategory = mysqli_query($conn, $sqlGetCategory);
+    // Prepare SQL query to fetch category details safely
+    $stmt = mysqli_prepare($conn, "SELECT n_category_id, v_category_title, v_category_meta_title FROM blog_category WHERE v_category_path = ?");
+    if (!$stmt) {
+        die("Prepare failed: " . mysqli_error($conn));
+    }
+    mysqli_stmt_bind_param($stmt, "s", $categoryPath);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $rowGetCategory = mysqli_fetch_assoc($result);
+    mysqli_stmt_close($stmt);
 
-    // Fetch the category row from the result set if exists
-    if($rowGetCategory = mysqli_fetch_assoc($queryGetCategory)){
-        // Store the category ID, title, and meta title into variables
-        $categoryId = $rowGetCategory['n_category_id'];
+    // If category found, continue
+    if ($rowGetCategory) {
+        $categoryId = (int) $rowGetCategory['n_category_id'];
         $categoryTitle = $rowGetCategory['v_category_title'];
         $categoryMetaTitle = $rowGetCategory['v_category_meta_title'];
 
@@ -25,24 +29,66 @@ if(isset($_GET['group'])){
         $postsPerPage = 4;
         // Get the current page number from URL if set and valid; default to 1
         $page = isset($_GET['page']) && is_numeric($_GET['page']) ? (int) $_GET['page'] : 1;
+        $page = max(1, $page); // ensure page >= 1
         // Calculate the offset for the SQL LIMIT clause
         $offset = ($page - 1) * $postsPerPage;
 
-        // Count total number of posts in the category with status = 1 (published)
-        $sqlCount = "SELECT COUNT(*) as total FROM blog_post WHERE n_category_id = '$categoryId' AND f_post_status = '1'";
-        $resultCount = mysqli_query($conn, $sqlCount);
+        // Count total number of posts in the category with status = 1 (published) safely
+        $stmtCount = mysqli_prepare($conn, "SELECT COUNT(*) as total FROM blog_post WHERE n_category_id = ? AND f_post_status = 1");
+        if (!$stmtCount) {
+            die("Prepare failed: " . mysqli_error($conn));
+        }
+        mysqli_stmt_bind_param($stmtCount, "i", $categoryId);
+        mysqli_stmt_execute($stmtCount);
+        $resultCount = mysqli_stmt_get_result($stmtCount);
         $rowCount = mysqli_fetch_assoc($resultCount);
-        $totalPosts = $rowCount['total'];
-        // Calculate total pages needed for pagination
-        $totalPages = ceil($totalPosts / $postsPerPage);
+        mysqli_stmt_close($stmtCount);
 
-    }
-    else{
+			if ($rowCount) {
+				$totalPosts = (int) $rowCount['total'];
+			} else {
+				$totalPosts = 0;
+		}
+		
+        // Calculate total pages needed for pagination
+        $totalPages = (int) ceil($totalPosts / $postsPerPage);
+
+        // Prepare SQL query to fetch blog posts safely
+			$stmtPosts = mysqli_prepare($conn,
+				"SELECT 
+					v_post_title, 
+					v_post_path, 
+					v_post_summary, 
+					v_alt_image_url
+				 FROM 
+					blog_post
+				 WHERE 
+					n_category_id = ? 
+					AND f_post_status = 1
+				 ORDER BY 
+					n_blog_post_id DESC
+				 LIMIT ? 
+				 OFFSET ?"
+			);
+			
+        if (!$stmtPosts) {
+            die("Prepare failed: " . mysqli_error($conn));
+        }
+        mysqli_stmt_bind_param($stmtPosts, "iii", $categoryId, $postsPerPage, $offset);
+        mysqli_stmt_execute($stmtPosts);
+        $resultPosts = mysqli_stmt_get_result($stmtPosts);
+        mysqli_stmt_close($stmtPosts);
+
+    } else {
         // If category not found, redirect to homepage
         header("Location: index.php");
         exit();
     }
-
+} else {
+    // Redirect to homepage if 'group' parameter is missing
+    header("Location: index.php");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -51,7 +97,7 @@ if(isset($_GET['group'])){
 
     <!-- Basic page metadata -->
     <meta charset="utf-8">
-    <title>Son's Blog | <?php echo $categoryMetaTitle; ?> </title>
+    <title>The Living Free| <?php echo htmlspecialchars($categoryMetaTitle, ENT_QUOTES, 'UTF-8'); ?> </title>
     <meta name="description" content="Posts in category: <?php echo htmlspecialchars($categoryMetaTitle, ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="author" content="Son Le">
 
@@ -93,7 +139,7 @@ if(isset($_GET['group'])){
                 <div class="column large-12">
                     <h1 class="page-title">
                         <span class="page-title__small-type">Category</span>
-                        <?php echo $categoryTitle; ?>
+                        <?php echo htmlspecialchars($categoryTitle, ENT_QUOTES, 'UTF-8'); ?>
                     </h1>
                 </div>
             </div>
@@ -113,25 +159,14 @@ if(isset($_GET['group'])){
                     </div>
 
         <?php
-        // Query to get all blog posts for this category that are published
-        // Order by latest post ID descending, limit by postsPerPage and offset for pagination
-        $sqlGetAllBlogs = "SELECT * FROM blog_post 
-                           WHERE n_category_id = '$categoryId' AND f_post_status = '1' 
-                           ORDER BY n_blog_post_id DESC 
-                           LIMIT $postsPerPage OFFSET $offset";
-
-        // Execute the query
-        $queryGetAllBlogs = mysqli_query($conn, $sqlGetAllBlogs);
-
         // Loop through each blog post and display it
-        while($rowGetAllBlogs = mysqli_fetch_assoc($queryGetAllBlogs)){
+        while ($rowGetAllBlogs = mysqli_fetch_assoc($resultPosts)) {
 
-            // Extract relevant blog post data
+            // Extract relevant blog post data safely
             $blogTitle       = $rowGetAllBlogs['v_post_title'];
             $blogPath        = $rowGetAllBlogs['v_post_path'];
             $blogSummary     = $rowGetAllBlogs['v_post_summary'];
             $blogAltImageUrl = $rowGetAllBlogs['v_alt_image_url'];
-
         ?>
 
                     <!-- Single blog post article -->
@@ -139,8 +174,8 @@ if(isset($_GET['group'])){
 
                         <div class="entry__thumb">
                             <a href="single-blog.php?blog=<?php echo $blogPath; ?>" class="thumb-link">
-                                <img src="<?php echo $blogAltImageUrl; ?>" 
-                                     srcset="<?php echo $blogAltImageUrl; ?> 1x, <?php echo $blogAltImageUrl; ?> 2x" alt="">
+                                <img src="<?php echo htmlspecialchars($blogAltImageUrl, ENT_QUOTES, 'UTF-8'); ?>" 
+                                     srcset="<?php echo htmlspecialchars($blogAltImageUrl, ENT_QUOTES, 'UTF-8'); ?> 1x, <?php echo htmlspecialchars($blogAltImageUrl, ENT_QUOTES, 'UTF-8'); ?> 2x" alt="">
                             </a>
                         </div> <!-- end entry__thumb -->
 
@@ -148,7 +183,7 @@ if(isset($_GET['group'])){
                             <div class="entry__header">
                                 <h1 class="entry__title">
                                     <a href="single-blog.php?blog=<?php echo $blogPath; ?>">
-                                        <?php echo $blogTitle; ?>
+                                        <?php echo htmlspecialchars($blogTitle, ENT_QUOTES, 'UTF-8'); ?>
                                     </a>
                                 </h1>
 
@@ -162,7 +197,7 @@ if(isset($_GET['group'])){
                             </div>
                             <div class="entry__excerpt">
                                 <p>
-                                    <?php echo $blogSummary; ?>
+                                    <?php echo htmlspecialchars($blogSummary, ENT_QUOTES, 'UTF-8'); ?>
                                 </p>
                             </div>
                             <a class="entry__more-link" href="single-blog.php?blog=<?php echo $blogPath; ?>">Read Blog</a>
@@ -221,12 +256,3 @@ if(isset($_GET['group'])){
 </body>
 
 </html>
-
-<?php
-} // end if isset($_GET['group'])
-else {
-    // Redirect to homepage if 'group' parameter is missing
-    header("Location: index.php");
-    exit();
-}
-?>

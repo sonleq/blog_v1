@@ -1,6 +1,5 @@
 <?php
 
-
 // Include database connection
 require "dbh.php";
 
@@ -9,7 +8,6 @@ session_start();
 
 // Check if the submit-blog button was clicked
 if(isset($_POST['submit-edit-blog'])){
-
 
 // mysqli_real_escape_string escapes special characters in a string so they don’t break your SQL query — especially characters like:
 // ' (single quote)
@@ -51,10 +49,9 @@ $blogId = mysqli_real_escape_string($conn, $_POST['blog-id']);
     if(strpos($blogPath, " ") !== false){
         formError("pathcontainsspaces");
     }
-    // If no home page placement is selected, set it to 0
-    if(empty($homePagePlacement)){
-        $homePagePlacement = 0;
-    }
+	
+ $homePagePlacement = isset($_POST['blog-home-page-placement']) ? (int)$_POST['blog-home-page-placement'] : 0;
+
     
     // Check if the title already exists in the database (excluding deleted posts)
     $sqlCheckBlogTitle = "SELECT v_post_title FROM blog_post WHERE v_post_title = '$title' AND v_post_title != '$title' AND f_post_status !='2'";
@@ -78,14 +75,17 @@ $blogId = mysqli_real_escape_string($conn, $_POST['blog-id']);
         
         if(mysqli_num_rows($queryCheckBlogHomePagePlacement ) > 0 ){
 			
-            // If another blog is placed in the same home page spot, set the previous blog's placement to 0
-            $sqlUpdateBlogHomePagePlacement = "UPDATE blog_post SET n_home_page_placement = '0' WHERE n_home_page_placement = '$homePagePlacement' AND f_post_status !='2'";
-			
-            if(!mysqli_query($conn, $sqlUpdateBlogHomePagePlacement)){
-                formError("homepageplacementerror");
-            }
-        }
-    }
+           if($homePagePlacement > 0){
+    $sqlClearSlot = "UPDATE blog_post 
+                     SET n_home_page_placement = 0 
+                     WHERE n_home_page_placement = $homePagePlacement 
+                     AND n_blog_post_id != $blogId";
+    if(!mysqli_query($conn, $sqlClearSlot)){
+        formError("homepageplacementerror");
+			}
+		}				
+  }
+}
 
     // Handle image uploads for main and alternate images
     $mainImgUrl = uploadImage($_FILES["main-blog-image"]["name"], "main-blog-image", "main", "v_main_image_url");

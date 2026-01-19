@@ -1,0 +1,149 @@
+<?php
+// Include database connection
+require "dbh.php";
+session_start();
+
+// Check if the edit blog form was submitted
+if(isset($_POST['submit-edit-blog'])) {
+
+    // Escape and sanitize inputs
+    $blogId        = mysqli_real_escape_string($conn, $_POST['blog-id']);
+    $blogCategoryId= mysqli_real_escape_string($conn, $_POST['blog-category']);
+    $title         = mysqli_real_escape_string($conn, $_POST['blog-title']);
+    $metaTitle     = mysqli_real_escape_string($conn, $_POST['blog-meta-title']);
+    $blogSummary   = mysqli_real_escape_string($conn, $_POST['blog-summary']);
+    $blogContent   = mysqli_real_escape_string($conn, $_POST['blog-content']);
+    $blogTags      = mysqli_real_escape_string($conn, $_POST['blog-tags']);
+    $blogPath      = mysqli_real_escape_string($conn, $_POST['blog-path']);
+    $homePagePlacement = isset($_POST['blog-home-page-placement']) ? (int)$_POST['blog-home-page-placement'] : 0;
+
+    $date = date("Y-m-d");
+    $time = date("H:i:s");
+
+    // --- VALIDATION ---
+    if(empty($title)) formError("emptytitle");
+    if(empty($blogCategoryId)) formError("emptycategory");
+    if(empty($blogSummary)) formError("emptysummary");
+    if(empty($blogContent)) formError("emptycontent");
+    if(empty($blogTags)) formError("emptytags");
+    if(empty($blogPath)) formError("emptypath");
+    if(strpos($blogPath, " ") !== false) formError("pathcontainsspaces");
+
+    // Check for duplicate title/path
+    $sqlCheckTitle = "SELECT n_blog_post_id FROM blog_post WHERE v_post_title='$title' AND n_blog_post_id != '$blogId' AND f_post_status !='2'";
+    $sqlCheckPath  = "SELECT n_blog_post_id FROM blog_post WHERE v_post_path='$blogPath' AND n_blog_post_id != '$blogId' AND f_post_status !='2'";
+    if(mysqli_num_rows(mysqli_query($conn, $sqlCheckTitle)) > 0) formError("titlebeingused");
+    if(mysqli_num_rows(mysqli_query($conn, $sqlCheckPath)) > 0) formError("pathbeingused");
+
+    // Handle images
+    $mainImgUrl = uploadImage($_FILES["main-blog-image"]["name"], "main-blog-image", "main", "v_main_image_url");
+    $altImgUrl  = uploadImage($_FILES["alt-blog-image"]["name"], "alt-blog-image", "alt", "v_alt_image_url");
+
+    // Build SQL update statement dynamically for images
+    $updateFields = "
+        n_category_id='$blogCategoryId',
+        v_post_title='$title',
+        v_post_meta_title='$metaTitle',
+        v_post_path='$blogPath',
+        v_post_summary='$blogSummary',
+        v_post_content='$blogContent',
+        n_home_page_placement='$homePagePlacement',
+        d_date_updated='$date',
+        d_time_updated='$time'";
+
+    if($mainImgUrl != "noupdate") $updateFields .= ", v_main_image_url='$mainImgUrl'";
+    if($altImgUrl  != "noupdate") $updateFields .= ", v_alt_image_url='$altImgUrl'";
+
+    $sqlUpdateBlog = "UPDATE blog_post SET $updateFields WHERE n_blog_post_id='$blogId'";
+    $sqlUpdateBlogTags = "UPDATE blog_tag SET v_tag='$blogTags' WHERE n_blog_post_id='$blogId'";
+
+    // --- TRANSACTION: Handle slot replacement ---
+    mysqli_begin_transaction($conn);
+
+    try {
+        // Clear previous slot if needed
+        if($homePagePlacement > 0){
+            $sqlClearSlot = "UPDATE blog_post SET n_home_page_placement=0 WHERE n_home_page_placement=? AND n_blog_post_id != ?";
+            $stmt = mysqli_prepare($conn, $sqlClearSlot);
+            mysqli_stmt_bind_param($stmt, "ii", $homePagePlacement, $blogId);
+            mysqli_stmt_execute($stmt);
+        }
+
+        // Update blog post and tags
+        if(!mysqli_query($conn, $sqlUpdateBlog) || !mysqli_query($conn, $sqlUpdateBlogTags)){
+            throw new Exception("sqlerror");
+        }
+
+        mysqli_commit($conn);
+        formSuccess();
+
+    } catch(Exception $e){
+        mysqli_rollback($conn);
+        formError($e->getMessage());
+    }
+
+} else {
+    header("Location: ../index.php");
+    exit();
+}
+
+// --- FUNCTIONS ---
+
+function formSuccess(){
+    global $conn;
+    mysqli_close($conn);
+    unset($_SESSION['editBlogId'], $_SESSION['editTitle'], $_SESSION['editMetaTitle'], $_SESSION['editCategoryId'], $_SESSION['editSummary'], $_SESSION['editContent'], $_SESSION['editPath'], $_SESSION['editTags'], $_SESSION['editHomePagePlacement']);
+    header("Location: ../blogs.php?updateblog=success");
+    exit();
+}
+
+function formError($errorCode){
+    global $conn;
+    $_SESSION['editTitle'] = $_POST['blog-title'];
+    $_SESSION['editMetaTitle'] = $_POST['blog-meta-title'];
+    $_SESSION['editCategoryId'] = $_POST['blog-category'];
+    $_SESSION['editSummary'] = $_POST['blog-summary'];
+    $_SESSION['editContent'] = $_POST['blog-content'];
+    $_SESSION['editTags'] = $_POST['blog-tags'];
+    $_SESSION['editPath'] = $_POST['blog-path'];
+    $_SESSION['editHomePagePlacement'] = $_POST['blog-home-page-placement'] ?? 0;
+    mysqli_close($conn);
+    header("Location: ../edit-blog.php?updateblog=".$errorCode);
+    exit();
+}
+
+function uploadImage($img, $imgName, $imgType, $imgDbColumn){
+    global $conn;
+    $validExt = ["jpg","jpeg","png","gif","bmp"];
+
+    if(empty($img)) return "noupdate";
+
+    if($_FILES[$imgName]["size"] <= 0) formError($imgType."imageerror");
+
+    $ext = strtolower(pathinfo($img, PATHINFO_EXTENSION));
+    if(!in_array($ext, $validExt)) formError("invalidtype".$imgType."image");
+
+    // Delete old image
+    $blogId = $_POST['blog-id'];
+    $sqlOld = "SELECT $imgDbColumn FROM blog_post WHERE n_blog_post_id='$blogId'";
+    $res = mysqli_query($conn, $sqlOld);
+    if($row = mysqli_fetch_assoc($res)){
+        $oldImg = $row[$imgDbColumn];
+        if(!empty($oldImg)){
+            $oldImgName = basename($oldImg);
+            $oldImgPath = "../images/blog-images/".$oldImgName;
+            if(file_exists($oldImgPath)) unlink($oldImgPath);
+        }
+    }
+
+    // Upload new image
+    $folder = "../images/blog-images/";
+    $imgNewName = rand(10000,990000).'_'.time().'.'.$ext;
+    $imgPath = $folder.$imgNewName;
+    if(move_uploaded_file($_FILES[$imgName]['tmp_name'], $imgPath)){
+        return "http://localhost/blog/admin/images/blog-images/".$imgNewName;
+    } else {
+        formError("erroruploading".$imgType."image");
+    }
+}
+?>
